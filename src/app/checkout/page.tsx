@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Check, MapPin, Phone, Trash, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Check, MapPin, Phone, Trash, ChevronDown, Mail } from 'lucide-react';
 import { getCartItem, clearCart } from '@/utils/cart';
 import { preventScrollOnClick } from '@/utils/scrollUtils';
 import type { CartItem } from '@/utils/cart';
@@ -15,6 +15,7 @@ interface ShippingData {
   city: string;
   zipCode: string;
   state: string;
+  email: string;
   phoneNumber: string;
 }
 
@@ -27,12 +28,14 @@ const CheckoutPage: React.FC = () => {
     city: '',
     zipCode: '',
     state: '',
+    email: '',
     phoneNumber: ''
   });
   const [stateSuggestions, setStateSuggestions] = useState<string[]>([]);
   const [showStateSuggestions, setShowStateSuggestions] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [selectedCountryCode, setSelectedCountryCode] = useState('+1');
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
@@ -162,6 +165,11 @@ const CheckoutPage: React.FC = () => {
       setPhoneError('');
     }
 
+    // Clear email error when user starts typing
+    if (name === 'email') {
+      setEmailError('');
+    }
+
     if (name === 'state') {
       if (value.length >= 2) {
         const filtered = allRegions.filter(region => 
@@ -226,15 +234,23 @@ const CheckoutPage: React.FC = () => {
   const handleContinueToCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate phone number
-    const fullPhoneNumber = selectedCountryCode + shippingData.phoneNumber;
-    if (!validatePhoneNumber(fullPhoneNumber)) {
-      setPhoneError('Please enter a valid phone number');
+    // Validate email
+    if (!shippingData.email) {
+      setEmailError('Email address is required');
       return;
     }
 
+    // Validate phone number only if provided
+    if (shippingData.phoneNumber) {
+      const fullPhoneNumber = selectedCountryCode + shippingData.phoneNumber;
+      if (!validatePhoneNumber(fullPhoneNumber)) {
+        setPhoneError('Please enter a valid phone number');
+        return;
+      }
+    }
+
     // Check if all required fields are filled
-    const requiredFields = ['streetAddress', 'city', 'state', 'zipCode', 'phoneNumber'];
+    const requiredFields = ['streetAddress', 'city', 'state', 'zipCode'];
     const missingFields = requiredFields.filter(field => !shippingData[field as keyof typeof shippingData]);
     
     if (missingFields.length > 0) {
@@ -248,7 +264,7 @@ const CheckoutPage: React.FC = () => {
       // Send shipping information to email
       const shippingDataWithFullPhone = {
         ...shippingData,
-        phoneNumber: selectedCountryCode + shippingData.phoneNumber
+        phoneNumber: shippingData.phoneNumber ? selectedCountryCode + shippingData.phoneNumber : ''
       };
       const emailSent = await sendShippingEmail(shippingDataWithFullPhone, product);
       
@@ -323,6 +339,12 @@ const CheckoutPage: React.FC = () => {
                 <div>{shippingData.state}{shippingData.state && shippingData.zipCode ? ', ' : ''}{shippingData.zipCode}</div>
               ) : null}
             </div>
+            {shippingData.email && (
+              <div className="flex items-center gap-2 mt-2">
+                <Mail className="h-5 w-5 text-[#0046be]" />
+                <span className="text-[#0046be] text-base">{shippingData.email}</span>
+              </div>
+            )}
             {selectedCountryCode && shippingData.phoneNumber && (
               <div className="flex items-center gap-2 mt-2">
                 <Phone className="h-5 w-5 text-[#0046be]" />
@@ -514,10 +536,31 @@ const CheckoutPage: React.FC = () => {
                       />
                     </div>
 
+                    {/* Email Field */}
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-3">
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={shippingData.email}
+                        onChange={handleInputChange}
+                        required
+                        className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0046be] focus:border-[#0046be] transition-all duration-300"
+                        placeholder="Enter your email address"
+                        autoComplete="email"
+                      />
+                      {emailError && (
+                        <p className="mt-2 text-sm text-red-600">{emailError}</p>
+                      )}
+                    </div>
+
                     {/* Phone Number Input - Replace old select/input with custom dropdown and input */}
                     <div>
                       <label htmlFor="phoneNumber" className="block text-sm font-semibold text-gray-700 mb-3">
-                        Phone Number *
+                        Phone Number (Optional)
                       </label>
                       <div className="flex space-x-2">
                         <div ref={countryDropdownRef} className="relative w-auto min-w-[70px] max-w-[90px]">
@@ -537,33 +580,22 @@ const CheckoutPage: React.FC = () => {
                             <ChevronDown size={18} className={`ml-1 transition-transform duration-200 ${isCountryDropdownOpen ? 'rotate-180' : ''}`} />
                           </button>
                           {isCountryDropdownOpen && (
-                            <ul
-                              tabIndex={-1}
-                              role="listbox"
-                              className="absolute left-0 z-20 mt-2 w-max min-w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-fadeIn"
-                            >
+                            <div className="absolute z-20 top-full left-0 mt-2 w-64 bg-white border-2 border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                               {countryCodes.map((country) => (
-                                <li
-                                  key={country.code + '-' + country.country}
-                                  role="option"
-                                  aria-selected={selectedCountryCode === country.code}
-                                  className={`px-4 py-2 cursor-pointer transition-colors duration-150 rounded-lg ${selectedCountryCode === country.code ? 'bg-blue-100 font-bold text-[#0046be]' : 'hover:bg-blue-50'}`}
+                                <button
+                                  key={`${country.code}-${country.country}`}
+                                  type="button"
+                                  className="w-full text-left p-4 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors duration-200"
                                   onClick={() => {
                                     setSelectedCountryCode(country.code);
                                     setIsCountryDropdownOpen(false);
                                   }}
-                                  tabIndex={0}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      setSelectedCountryCode(country.code);
-                                      setIsCountryDropdownOpen(false);
-                                    }
-                                  }}
                                 >
-                                  {country.code} {country.country}
-                                </li>
+                                  <div className="font-medium text-gray-900">{country.country}</div>
+                                  <div className="text-sm text-gray-500">{country.code}</div>
+                                </button>
                               ))}
-                            </ul>
+                            </div>
                           )}
                         </div>
                         <input
@@ -572,19 +604,18 @@ const CheckoutPage: React.FC = () => {
                           name="phoneNumber"
                           value={shippingData.phoneNumber}
                           onChange={handleInputChange}
-                          required
                           maxLength={15}
                           className={`flex-1 px-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0046be] focus:border-[#0046be] transition-all duration-300 ${
                             phoneError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200'
                           }`}
-                          placeholder="Enter your phone number"
+                          placeholder="Enter your phone number (optional)"
                           autoComplete="tel"
                         />
                       </div>
                       {phoneError && (
                         <p className="mt-2 text-sm text-red-600">{phoneError}</p>
                       )}
-                      <p className="mt-2 text-xs text-gray-500">Needed for secure delivery and order updates</p>
+                      <p className="mt-2 text-xs text-gray-500">Optional - for delivery updates and order tracking</p>
                     </div>
 
                     <button

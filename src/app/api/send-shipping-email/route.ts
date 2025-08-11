@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
         <li><strong>City:</strong> ${shippingData.city}</li>
         <li><strong>State/Province:</strong> ${shippingData.state}</li>
         <li><strong>Zip Code:</strong> ${shippingData.zipCode}</li>
-        <li><strong>Phone Number:</strong> ${shippingData.phoneNumber}</li>
+        <li><strong>Email:</strong> ${shippingData.email}</li>
+        <li><strong>Phone Number:</strong> ${shippingData.phoneNumber || 'Not provided'}</li>
       </ul>
 
       <p><strong>Order Date:</strong> ${new Date().toLocaleString()}</p>
